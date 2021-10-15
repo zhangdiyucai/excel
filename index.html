@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./css/bootstrap.css">
+  <!-- <script src="./js/alasql.js"></script> -->
+  <!-- <script src="./js/xlsx.core.min.js"></script> -->
+  <script src="./js/jquery-1.9.1.min.js"></script>
+  <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.15&key=51b08d7c1050212b30d7a8d8d5330bb7">
+  </script>
+  <!--<script type="text/javascript" src="https://cache.amap.com/lbs/static/addToolbar.js"></script>-->
+  <script src="https://webapi.amap.com/loca?v=1.3.2&key=51b08d7c1050212b30d7a8d8d5330bb7"></script>
+  <title>表格生成计算</title>
+</head>
+
+<body>
+  <button class="btn btn-default" type="submit" onclick="getXlsxFiles()">点击生成表格</button>
+</body>
+
+<script>
+  var regionbankLists = []; // 区域支行集合
+  var netLists = [];//网点集合
+
+  var prefix = 'http://pets.txsckj.cn/bankmap';
+
+  var heatdata = [{
+    name: '东城区',
+    value: 90.5,
+    lnglat: [116.42272, 39.934579]
+  }, {
+    name: '西城区',
+    value: 129.8,
+    lnglat: [116.372397, 39.918561]
+  }, {
+    name: '朝阳区',
+    value: 395.5,
+    lnglat: [116.449767, 39.927254]
+  }, {
+    name: '丰台区',
+    value: 232.4,
+    lnglat: [116.293105, 39.865042]
+  },
+  {
+    name: '石景山区',
+    value: 65.2,
+    lnglat: [116.229612, 39.912017]
+  },
+
+  {
+    name: '海淀区',
+    value: 369.4,
+    lnglat: [116.304872, 39.96553]
+  },
+
+  {
+    name: '门头沟区',
+    value: 30.8,
+    lnglat: [116.108179, 39.94648]
+  },
+  {
+    name: '房山区',
+    value: 104.6,
+    lnglat: [116.149892, 39.755039]
+  },
+
+  {
+    name: '通州区',
+    value: 232.4,
+    lnglat: [116.658603, 39.902486]
+  },
+  {
+    name: '顺义区',
+    value: 102,
+    lnglat: [116.663242, 40.1362]
+  },
+  {
+    name: '昌平区',
+    value: 196.3,
+    lnglat: [116.237832, 40.226854]
+  },
+  {
+    name: '大兴区',
+    value: 156.2,
+    lnglat: [116.348053, 39.732833]
+  },
+  {
+    name: '怀柔区',
+    value: 38.4,
+    lnglat: [116.63853, 40.322563]
+  },
+  {
+    name: '平谷区',
+    value: 42.3,
+    lnglat: [117.128025, 40.147115]
+  },
+  {
+    name: '密云区',
+    value: 47.9,
+    lnglat: [116.849551, 40.382999]
+  },
+  {
+    name: '延庆区',
+    value: 232.4,
+    lnglat: [115.985006, 40.465325]
+  }];
+
+
+  var xlsArr = [];
+  // 获得某个区域的一级支行列表
+  function getRegionbankList(val) {
+    $.ajax({
+      "url": `${prefix}/api/bj/bank/queryDropList`,
+      "type": "post",
+      "async": false,
+      "data": JSON.stringify({
+        region: val,
+        bankNumber: ''
+      }),
+      "headers": {
+        'content-type': "application/json",
+      },
+      "success": function (res) {
+        if (res.code === 0) {
+          // console.log(res, '一级支行列表数据');
+          regionbankLists = regionbankLists.concat(res.data);
+        }
+      },
+      "error": function (obj) { }
+    });
+  }
+  // 获得所有区域的一级支行列表
+  function getAllRegionbankList() {
+    heatdata.forEach(ele => {
+      getRegionbankList(ele.name)
+    });
+  }
+
+
+  // 得道单独网点的数据
+  function getNetList(ele) {
+    $.ajax({
+      "url": prefix + "/api/bj/bank/queryOneBank/" + ele.sysNumber,
+      "type": "get",
+      "async": false,
+      "data": {
+        systemNumber: ele.sysNumber
+      },
+      "success": function (res) {
+        if (res.code === 0) {
+          // console.log('得道单独网点的数据', res.data);
+          // console.log('ele', ele);
+          var arr = res.data;
+          xlsArr.push({ name: ele.subAdd, aver: getMinAver(arr) });
+
+        } else {
+          alert(res.message);
+        }
+      },
+      "error": function (obj) { }
+    });
+  }
+
+  // 得道全部网点的数据
+  function getAllNetList() {
+    regionbankLists.forEach((ele, index) => {
+      // console.log(index, ele);
+      // if (index == 1) {
+      // console.log('xxx');
+      getNetList(ele)
+      // }
+    });
+  }
+
+  // 函数
+  Array.prototype.avg = function (call) {
+    let type = Object.prototype.toString.call(call);
+    let sum = 0;
+    if (type === '[object Function]') {
+      sum = this.reduce((pre, cur, i) => pre + call(cur, i), 0);
+    } else {
+      sum = this.reduce((pre, cur) => pre + cur);
+    }
+    return sum / this.length;
+  };
+
+  // 计算单独区域的平值
+
+  function getMinAver(arr) {
+    var dis = 0;
+    var min = 0;
+    var minArr = [];
+    for (var i = 0; i < arr.length; i++) {
+      for (var j = 0; j < arr.length; j++) {
+        if (!i == j) {
+
+          dis = AMap.GeometryUtil.distance([arr[i].lng, arr[i].lat], [arr[j].lng, arr[j].lat]);
+
+          if (min == 0) {
+            min = dis;
+          } else if (min > dis) {
+            min = dis;
+          } else {
+            // 什么也不做
+          }
+        }
+      }
+      minArr.push(min);
+    }
+    // console.log('minArr.avg()', minArr);
+    if (minArr.length == 0) {
+      return null
+    } else {
+      return minArr.avg();
+    }
+
+  };
+
+
+  // excel 功能
+  function downLoadExcel(data, fileName) {
+    //定义表头
+    let str = `支行名称,平均值（米）\n`;
+    //增加\t为了不让表格显示科学计数法或者其他格式
+    for (let i = 0; i < data.length; i++) {
+      for (let item in data[i]) {
+        str += `${data[i][item] + '\t'},`;
+      }
+      str += '\n';
+    }
+    // console.log('str', str);
+    //encodeURIComponent解决中文乱码
+    let uri = 'data:text/csv;charset=utf-8,\ufeff' + encodeURIComponent(str);
+    //通过创建a标签实现
+    let link = document.createElement("a");
+    link.href = uri;
+    //对下载的文件命名
+    link.download = `${fileName || '表格数据'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  function getXlsxFiles() {
+    // getXlsxFiles
+    downLoadExcel(xlsArr, "区域网点间距均值列表");
+    // alasql('SELECT * INTO XLS("报表.xls",{headers:true}) FROM ?', [xlsArr]);
+  }
+
+
+  // 获取所有支行数据
+  getAllRegionbankList();
+  getAllNetList();
+
+
+
+</script>
+
+</html>
